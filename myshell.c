@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/stat.h>
 #include <limits.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define MAX_CMD_LINE		4096
 #define MAX_CMD_PARAMS		128
@@ -15,15 +15,7 @@ typedef struct tagCMD {
 } CMD;
 
 void parse_cmd_line(char *cmdline);
-
-void dir_proc(void);
-void clear_proc(void);
-void pwd_proc(void);
 void cd_proc(void);
-void umask_proc(void);
-
-int check_umask_arg(const char *str);
-
 void exit_sys(const char *msg);
 
 char *g_params[MAX_CMD_PARAMS];
@@ -31,11 +23,7 @@ int g_nparams;
 char g_cwd[PATH_MAX];
 
 CMD g_cmds[] = {
-	{"dir", dir_proc},
-	{"clear", clear_proc},
-	{"pwd", pwd_proc},
 	{"cd", cd_proc},
-	{"umask", umask_proc},
 	{NULL, NULL}
 };
 
@@ -44,6 +32,7 @@ int main(void)
 	char cmdline[MAX_CMD_LINE];
 	char *str;
 	int i;
+	pid_t pid;
 
 	if (getcwd(g_cwd, PATH_MAX) == NULL)
 		exit_sys("fatal error (getcwd)");
@@ -64,8 +53,18 @@ int main(void)
 				g_cmds[i].proc();
 				break;
 			}
-		if (g_cmds[i].name == NULL)
-			printf("bad command: %s\n", g_params[0]);
+		if (g_cmds[i].name == NULL) {
+			if ((pid = fork()) == -1) {
+				perror("fork");
+				continue;
+			}
+			if (pid == 0 && execvp(g_params[0], &g_params[0]) == -1){
+				fprintf(stderr, "command not found or cannot execute!\n");
+				continue;
+			}
+			if (wait(NULL) == -1)
+				exit_sys("wait");
+		}
 	}
 
 	return 0;
@@ -78,21 +77,7 @@ void parse_cmd_line(char *cmdline)
 	g_nparams = 0;
 	for (str = strtok(cmdline, " \t"); str != NULL; str = strtok(NULL, " \t"))
 		g_params[g_nparams++] = str;
-}
-
-void dir_proc(void)
-{
-	printf("dir command executing...\n");
-}
-
-void clear_proc(void)
-{
-	system("clear");
-}
-
-void pwd_proc(void)
-{
-	printf("%s\n", g_cwd);
+	g_params[g_nparams] = NULL;
 }
 
 void cd_proc(void)
@@ -117,46 +102,6 @@ void cd_proc(void)
 
 	if (getcwd(g_cwd, PATH_MAX) == NULL)
 		exit_sys("fatal error (getcwd)");
-}
-
-void umask_proc(void)
-{
-	mode_t mode;
-	int argval;
-
-	if (g_nparams > 2) {
-		printf("too many arguments in umask command!...\n");
-		return;
-	}
-
-	if (g_nparams == 1) {
-		mode = umask(0);
-		umask(mode);
-
-		printf("%04o\n", (int)mode);
-
-		return;
-	}
-
-	if (!check_umask_arg(g_params[1])) {
-		printf("%s octal number out of range!...\n", g_params[1]);
-		return;
-	}
-
-	sscanf(g_params[1], "%o", &argval);
-	umask(argval);
-}
-
-int check_umask_arg(const char *str)
-{
-	if (strlen(str) > 4)
-		return 0;
-
-	for (int i = 0; str[i] != '\0'; ++i)
-		if (str[i] < '0' || str[i] > '7')
-			return 0;
-
-	return 1;
 }
 
 void exit_sys(const char *msg)
