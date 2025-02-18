@@ -1,0 +1,48 @@
+    Aşağıdaki isimli borular kullanılarak bir client-server haberleşme örneği verilmiştir. Programla ilgili bazı açıklamaları
+    veriyoruz:
+
+    - Programda client'ların server'a mesaj göndermesi için kullandıkları borunun işin başında "serverpipe" ismiyle yaratılmış 
+    olması gerekmektedir. 
+
+    - Client ile server arasındaki haberleşmeler yazısal biçimde şöyle yapılmaktadır:
+
+    "KOMUT <parametrik bilgiler>"
+
+    Client ve server bu yazıyı parse edip komut ve parametrelerini birbirinden ayırmaktadır. 
+
+    - Server'ın client'a göndereceği mesajlar için kullanılacak borular server tarafından yaratılmaktadır. Bu sırada client 
+    "boru yaratılmış mı" diye beklemektedir. 
+
+    - Server her client'a bir id numarası vermektedir. Id numarası olarak proses id'ler değil client borulara ilişkin betimleyici 
+    numaraları kullanılmıştır. Server bağlantıyı sağladığında client borusunu yaratır, onun betimleyici numarasını boruya gönderir. 
+    Ancak client borusunun ismini client program belirlemektedir. Yani borunun ismi client program tarafından belirlenmekte ancak yaratımı
+    server program tarafından yapılmaktadır. 
+
+    - Client'tan server'a gönderilen mesajlar şunlardır:
+
+    CONNECT <boru ismi>
+    DISCONNECT_REQUEST
+    DISCONNECT
+    CMD <kabuk komutu>
+
+    Burada CMD client'ın server'a işlettireceği kabuk komutunu belirtmektedir. Yani server client'ın gönderdiği kabuk komutunu işletir. 
+    Onun sonucunu client'a yollar. 
+
+    - Server programın client programa gönderdiği mesajlar da şunlardır:
+
+    CMD_RESPONSE <komutun çıktı yazısı>
+    DISCONNECT_ACCEPTED
+    INVALID_COMMAND <hata yazısı>
+
+    - Client'ın bağlantıyı sonlandırması şöyle bir el sıkışmayla sağlanmıştır:
+
+    1) Önce client server'a DISCONNECT_REQUESTED mesajını gönderir.
+    2) Sonra server bu mesajı alınca eğer disconnect'i kabul ederse DISCONNECT_ACCEPTED mesajını gönderir.
+    3) Client son olarak server'a DISCONNECT mesajını göndererek el sıkışmayı sonlandırır.
+
+    - Client program bir komut satırı oluşturup komutların kullanıcı tarafından uygulanmasını sağlamaktadır. Ancak bağlantının sonlandırılması
+    bir dizi el sıkışma gerektirdiği için "quit" komutu sırasında yaptırılmıştır.
+
+    - Server programda client'ların bilgileri için bir veri yapısı oluşturulmamıştır. Zaten client id server'daki dosya betimleyicisi 
+    olduğu için böyle bir sözlük veri yapısına ihtiyaç duyulmamıştır. Tabii aslında client'ın pek çok bilgisini server saklamak isteyebilir. 
+    Genel olarak böyle bir veri yapısının oluşturulması uygundur.
