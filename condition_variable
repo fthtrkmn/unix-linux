@@ -1,0 +1,95 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <unistd.h>
+
+void *thread_proc1(void *param);
+void *thread_proc2(void *param);
+void exit_sys_errno(const char *msg, int eno);
+
+pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t g_cond = PTHREAD_COND_INITIALIZER;
+
+int g_flag = 0;
+
+int main(void)
+{
+	pthread_t tid1, tid2;
+	int result;
+
+	if ((result = pthread_create(&tid1, NULL, thread_proc1, NULL)) != 0)
+		exit_sys_errno("pthread_create", result);
+
+	if ((result = pthread_create(&tid2, NULL, thread_proc2, NULL)) != 0)
+		exit_sys_errno("pthread_create", result);
+
+	if ((result = pthread_join(tid1, NULL)) != 0)
+		exit_sys_errno("pthread_join", result);
+
+	if ((result = pthread_join(tid2, NULL)) != 0)
+		exit_sys_errno("pthread_join", result);
+
+	if ((result = pthread_mutex_destroy(&g_mutex)) != 0)
+		exit_sys_errno("pthread_mutex_destroy", result);
+
+	if ((result = pthread_cond_destroy(&g_cond)) != 0)
+		exit_sys_errno("pthread_cond_destroy", result);
+
+	return 0;
+}
+
+void *thread_proc1(void *param)
+{
+	int result;
+
+	printf("Press ENTER to continue...\n");
+	getchar();
+
+	if ((result = pthread_mutex_lock(&g_mutex)) != 0)
+		exit_sys_errno("pthread_mutex_lock", result);
+
+	g_flag = 1;
+
+	if ((result = pthread_cond_signal(&g_cond)) != 0)
+		exit_sys_errno("pthread_cond_signal", result);
+
+	if ((result = pthread_mutex_unlock(&g_mutex)) != 0)
+		exit_sys_errno("pthread_mutex_unlock", result);
+
+	printf("Thread1 continues...\n");
+
+	return NULL;
+}
+
+void *thread_proc2(void *param)
+{
+	int result;
+
+	if ((result = pthread_mutex_lock(&g_mutex)) != 0)
+		exit_sys_errno("pthread_mutex_lock", result);
+
+	printf("Thread2 locked mutex\n");
+
+	while (g_flag != 1) {
+		printf("Thread2 is waiting at the condition variable...\n");
+		if ((result = pthread_cond_wait(&g_cond, &g_mutex)) != 0)
+			exit_sys_errno("pthread_cond_wait", result);
+	}
+
+	if ((result = pthread_mutex_unlock(&g_mutex)) != 0)
+		exit_sys_errno("pthread_mutex_unlock", result);
+
+	printf("Thread2 unlocked mutex\n");
+
+	printf("Thread2 continues...\n");
+
+	return NULL;
+}
+
+void exit_sys_errno(const char *msg, int eno)
+{
+	fprintf(stderr, "%s: %s\n", msg, strerror(eno));
+
+	exit(EXIT_FAILURE);
+}
